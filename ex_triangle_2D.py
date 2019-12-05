@@ -91,6 +91,7 @@ for t in time:
     X = np.append(q1.xyz[0:2], np.append(q2.xyz[0:2], q3.xyz[0:2]))
     V = np.append(q1.v_ned[0:2], np.append(q2.v_ned[0:2], q3.v_ned[0:2]))
     U = fc.u_acc(X, V)
+    #print("U: ", U[0:2])
 
     q1.set_a_2D_alt_lya(U[0:2], -alt_d)
     q2.set_a_2D_alt_lya(U[2:4], -alt_d)
@@ -122,7 +123,7 @@ for t in time:
         #for j in range(0, 5-digits):
         #    namepic = '0' + namepic
         #pl.savefig("./images/%s.png"%namepic)
-        
+
         pl.figure(1)
         pl.clf()
         ani.draw2d(1, X, fc, quadcolor)
@@ -156,7 +157,7 @@ for t in time:
     Ed_log[it, :] = fc.Ed
 
     it+=1
-    
+
     # Stop if crash
     if (q1.crashed == 1 or q2.crashed == 1 or q3.crashed == 1):
         break

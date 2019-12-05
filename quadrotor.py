@@ -22,7 +22,7 @@ class quadrotor:
                                    [  l*kt,    0,-l*kt,     0],\
                                    [   -km,   km,  -km,   km]])
         self.Tlmn_to_w = la.inv(self.w_to_Tlmn)
-        
+
         # Physical variables
         self.att = att # Attitude [rad]
         self.pqr = pqr # Body angular velocity [rad/sec]
@@ -111,7 +111,7 @@ class quadrotor:
         e_alt  = self.xyz[2] - xyz_d[2]
         self.e_alt = e_alt
         e_xy   = self.xyz[0:2] - xyz_d[0:2]
-        
+
         self.T_d = (-self.xi_g -self.k_alt*e_alt \
                 -self.k_vz*self.v_ned[2])*self.m
 
@@ -133,13 +133,15 @@ class quadrotor:
 
     # Input: Desired 2D acceleration, Desired altitude
     def set_a_2D_alt_lya(self, a_2d_d, altitude_d):
-        e_alt  = self.xyz[2] - altitude_d
-        self.e_alt = e_alt
-        self.T_d = (-self.xi_g -self.k_alt*e_alt \
-                -self.k_vz*self.v_ned[2])*self.m
+        e_alt  = self.xyz[2] - altitude_d #Current pos - desired alt
 
+        self.e_alt = e_alt
+        self.T_d = (-self.xi_g -self.k_alt*e_alt - self.k_vz*self.v_ned[2])*self.m
+
+        #Set acc in x and y
         ax = a_2d_d[0]
         ay = a_2d_d[1]
+        
         # Guidance attitude
         phi_d = -self.m/self.T_d*(ay*np.cos(self.att[2])-ax*np.sin(self.att[2]))
         the_d =  self.m/self.T_d*(ax*np.cos(self.att[2])+ay*np.sin(self.att[2]))
@@ -159,8 +161,9 @@ class quadrotor:
 
     # Input: Desired 2D velocity, Desired altitude
     def set_v_2D_alt_lya(self, vxy_d, alt_d):
-        e_alt  = self.xyz[2] - alt_d
+        e_alt  = self.xyz[2] - alt_d #error_alttiude
         self.e_alt = e_alt
+
         vxy = self.v_ned[0:2]
         e_v = vxy - vxy_d
         self.e_v = e_v
@@ -197,7 +200,7 @@ class quadrotor:
         self.step_estimator_xi_CD(dt)
 
     def step_rotors(self, dt): # Motors modelled as 1st order linear system
-        # Check Saturation 
+        # Check Saturation
         for i in range (0, 4):
             if self.w_d[i] < 0:
                 self.w_d[i] = 0
@@ -254,7 +257,7 @@ class quadrotor:
 
         Dl = -p_dot*la.norm(p_dot)*self.CDl # Linear drag
         Dr = -self.pqr*la.norm(self.pqr)*self.CDr # Angular drag
-        
+
         self.Fa = Dl # Forces by the environment
         self.Ma = Dr # Moments by the environment
 
@@ -266,7 +269,7 @@ class quadrotor:
         elif x <= -np.pi:
             x = x + 2*np.pi
         return x
-    
+
     # Rotational matrix from Nav to Body
     def Rot_bn(self):
         phi = self.att[0]
@@ -318,7 +321,7 @@ class quadrotor:
         R = Rx.dot(Ry).dot(Rz)
         return R
 
-    
+
     # Propagation matrix for computing the angular velocity of the attitude
     def R_pqr(self):
         phi = self.att[0]

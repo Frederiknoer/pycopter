@@ -2,7 +2,8 @@ import numpy as np
 from scipy import linalg as la
 
 
-# The symbols are taken from the PhD Thesis "Distributed formation control for autonomous robots" University of Groningen.
+# The symbols are taken from the PhD Thesis
+#"Distributed formation control for autonomous robots" University of Groningen.
 
 class formation_distance:
     def __init__(self, m, l, d, mu, tilde_mu, B, c_shape, c_vel):
@@ -19,6 +20,7 @@ class formation_distance:
         self.Aa = self.Av.dot(self.B.T).dot(self.Av) # Matrix A for eventual acceleration
 
         # Kronecker products
+        #Multiply input with identity matrix to match dimension
         self.Bb = la.kron(self.B, np.eye(self.m))
         self.S1b = la.kron(self.S1, np.eye(self.m))
         self.S2b = la.kron(self.S2, np.eye(self.m))
@@ -37,10 +39,13 @@ class formation_distance:
 
     # Desired acceleration given \ddot p = u
     def u_acc(self, X, V):
+        #Dot dim-correct Incidence matrix (B . I) with X:
         Z = self.Bb.T.dot(X)
+
         Dz = self.make_Dz(Z)
         Dzt = self.make_Dzt(Z)
         self.Ed = self.make_E(Z)
+
         U = -self.c_shape*self.Bb.dot(Dz).dot(Dzt).dot(self.Ed) + \
                 self.c_vel*self.Avb.dot(Z) + self.Aab.dot(Z) \
                 - self.c_vel*V
@@ -89,13 +94,17 @@ class formation_distance:
     # Diagonal matrix spliting the z elements of Z
     def make_Dz(self, Z):
         Dz = np.zeros((Z.size, self.edges))
-    
+
         j = 0
 
         for i in range(0, self.edges):
             Dz[j:j+self.m, i] =  Z[j:j+self.m]
             j+=self.m
 
+        print("Z: ")
+        print(Z)
+        print("Dz: ")
+        print(Dz)
         return Dz
 
     # Diagonal matrix spliting the z/||z|| elements of Z
@@ -107,6 +116,10 @@ class formation_distance:
         for i in range(0, self.edges):
             Zt[i] = (la.norm(Z[(i*self.m):(i*self.m+self.m)]))**(self.l-2)
 
+        print("Z: ")
+        print(Z)
+        print("Dzt: ")
+        print(np.diag(Zt))
         return np.diag(Zt)
 
     # Construct distance error vector
@@ -129,5 +142,3 @@ class formation_distance:
                     A[i,j] = self.tilde_mu[j]
 
         return A
-
-

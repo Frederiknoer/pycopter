@@ -1,11 +1,21 @@
 from scipy import linalg as la
 import matplotlib.pyplot as pl
 import numpy as np
+from shapely.geometry import Point, LineString, Polygon
+import math
 
 import quadrotor as quad
 import formation_distance as form
 import quadlog
 import animation as ani
+import uwb_agent as range_agent
+
+
+def get_dist(p1, p2):
+    p1 = Point(p1[0], p1[1])
+    p2 = Point(p2[0], p2[1])
+    dist = math.sqrt( (p2.x - p1.x)**2 + (p2.y - p1.y)**2 )
+    return dist
 
 # Quadrotor
 m = 0.65 # Kg
@@ -85,14 +95,32 @@ q1.yaw_d = -np.pi
 q2.yaw_d =  np.pi/2
 q3.yaw_d =  0
 
+RA1 = range_agent.uwb_agent(ID=0, pos=Point( q1.xyz[0], q1.xyz[1] ))
+RA2 = range_agent.uwb_agent(ID=1, pos=Point( q2.xyz[0], q2.xyz[1] ))
+RA3 = range_agent.uwb_agent(ID=2, pos=Point( q3.xyz[0], q3.xyz[1] ))
+
 for t in time:
 
     # Simulation
-    X = np.append(q1.xyz[0:2], np.append(q2.xyz[0:2], q3.xyz[0:2]))
+    #X = np.append(q1.xyz[0:2], np.append(q2.xyz[0:2], q3.xyz[0:2]))
     V = np.append(q1.v_ned[0:2], np.append(q2.v_ned[0:2], q3.v_ned[0:2]))
+
+    #NEW:
+    RA1.update_pos(q1.xyz[0:2])
+    RA2.update_pos(q2.xyz[0:2])
+    RA3.update_pos(q3.xyz[0:2])
+
+    RA1.handle_range_msg(Id=RA2.id, nb_pos=RA2.pos)
+    RA1.handle_range_msg(Id=RA3.id, nb_pos=RA3.pos)
+
+    RA1.handle_other_msg(Id1=RA2.id, Id2=RA3.id, range=get_dist(RA2.pos, RA3.pos))
+
+    A,B,C = RA1.define_triangle()
+    X = [A.x, A.y, B.x, B.y, C.x, C.y]
 
     #Set This U (Input) from another class
     U = fc.u_acc(X, V)
+
 
     #Using lyapunov, input 2D acc, and desired alt
     q1.set_a_2D_alt_lya(U[0:2], -alt_d)

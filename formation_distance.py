@@ -100,34 +100,40 @@ class formation_distance:
         for i in range(0, self.edges):
             Dz[j:j+self.m, i] =  Z[j:j+self.m]
             j+=self.m
-
+        '''
         print("Z: ")
         print(Z)
         print("Dz: ")
         print(Dz)
+        '''
         return Dz
 
     # Diagonal matrix spliting the z/||z|| elements of Z
     def make_Dzt(self, Z):
         if self.l == 2:
             return np.eye(self.edges)
+        m = self.m
 
         Zt = np.zeros(self.edges)
         for i in range(0, self.edges):
-            Zt[i] = (la.norm(Z[(i*self.m):(i*self.m+self.m)]))**(self.l-2)
+            Zt[i] = ( la.norm( Z[(i * m):(i * m + m)] ) )**(self.l-2)
 
+        '''
         print("Z: ")
         print(Z)
         print("Dzt: ")
         print(np.diag(Zt))
+        '''
         return np.diag(Zt)
 
     # Construct distance error vector
     def make_E(self, Z):
-        E = np.zeros(self.edges)
+        # Z = Kronecker of B(incidence matrix) dot X(xy-pos of q1,q2,q3)
+        E = np.zeros(self.edges) # edges = B.shape (incidence matrix size)
+        m = self.m               # Dimensions
+        lya = self.l             # Order of lyapunov
         for i in range(0, self.edges):
-            E[i] = (la.norm(Z[(i*self.m):(i*self.m+self.m)]))**self.l \
-                    - self.d[i]**self.l
+            E[i] = ( la.norm( Z[(i * m):(i * m + m)] ) )**lya - (self.d[i]**lya)
 
         return E
 

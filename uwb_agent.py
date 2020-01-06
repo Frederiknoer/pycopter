@@ -120,7 +120,7 @@ class uwb_agent:
         #print(self.errorMatrix)
 
         U = []
-        K = 0.0002
+        K = 0.00002
         u = 0
         E = self.errorMatrix
 
@@ -148,9 +148,9 @@ class uwb_agent:
             print("U: ")
             print(U)
 
-        print ("A:", self.poslist[0].x,self.poslist[0].y, "  B: ", self.poslist[1].x,self.poslist[1].y, "  C: ", self.poslist[2].x,self.poslist[2].y)
-        print ("Error Matrix: ")
-        print (self.errorMatrix)
+            print ("A:", self.poslist[0].x,self.poslist[0].y, "  B: ", self.poslist[1].x,self.poslist[1].y, "  C: ", self.poslist[2].x,self.poslist[2].y)
+            print ("Error Matrix: ")
+            print (self.errorMatrix)
         print ("U: ")
         print (U)
         return U

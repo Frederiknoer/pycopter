@@ -17,6 +17,29 @@ def get_dist(p1, p2):
     dist = math.sqrt( (p2.x - p1.x)**2 + (p2.y - p1.y)**2 )
     return dist
 
+def getMag(x,y):
+    return math.sqrt(x**2 + y**2)
+
+def dotVec(v1, v2):
+    return (v1.x * v2.x) + (v1.y + v2.y)
+
+def getAngle(v1, v2):
+    return np.arctan(dotVec(v1,v2) / (getMag(v1.x,v1.y))*(getMag(v2.x,v2.y)))
+
+def getRotMat(q1, q2, q3, A, B, C):
+    q1 = Point(q1[0],q1[1])
+    q2 = Point(q2[0],q2[1])
+    q3 = Point(q3[0],q3[1])
+    a = (getAngle(q1, A) + getAngle(q2, B) + getAngle(q3, C)) / 3
+
+    m11 = np.cos(a)
+    m12 = np.sin(a)
+    m21 = -np.sin(a)
+    m22 = np.cos(a)
+
+    return np.array([ [m11, m12],
+                       [m21, m22]])
+
 # Quadrotor
 m = 0.65 # Kg
 l = 0.23 # m
@@ -121,23 +144,17 @@ for t in time:
     #fc = form.formation_distance(2, 1, dtriang, mu, tilde_mu, RA1.get_B(), 5e-2, 5e-1)
 
     X = [A.x, A.y, B.x, B.y, C.x, C.y]
-    '''
-    print("Ground Truth: ")
-    print(q1.xyz[0:2])
-    print(q2.xyz[0:2])
-    print(A.x, A.y)
-    print(B.x, B.y)
-    '''
-    #print(fc)
-    #q2x = ((abs(A.x-B.x)) - (side))/5 + ((abs(C.x-B.x)) - (side))/5
-    #q2y = ((abs(A.y-B.y)) - (side))/5 + ((abs(C.y-B.y)) - (side))/5
-    #q3x = ((abs(A.x-C.x)) - (side))/5 + ((abs(B.x-C.x)) - (side))/5
-    #q3y = ((abs(A.y-C.y)) - (side))/5 + ((abs(B.y-C.y)) - (side))/5
 
-    #Set This U (Input) from another class
-    U = RA1.calc_u_acc()
+    rotmat = getRotMat(q1.xyz[0:2], q2.xyz[0:2], q3.xyz[0:3], A, B, C)
+    u = RA1.calc_u_acc()
+    u1 = rotmat.dot(np.array([ u[0], u[1] ]) )
+    u2 = rotmat.dot(np.array([ u[2], u[3] ]) )
+    u3 = rotmat.dot(np.array([ u[4], u[5] ]) )
 
-    #print("U: ", U)
+    U = u1[0], u1[1], u2[0], u2[1], u3[0], u3[0]
+
+    print("Orientation corrected U: ")
+    print(U)
 
 
     #Using lyapunov, input 2D acc, and desired alt

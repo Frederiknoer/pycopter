@@ -67,7 +67,7 @@ tilde_mu = 0e-2*np.array([1, 1, 1])
 fc = form.formation_distance(2, 1, dtriang, mu, tilde_mu, Btriang, 5e-2, 5e-1)
 
 # Simulation parameters
-tf = 60
+tf = 300
 dt = 5e-2
 time = np.linspace(0, tf, tf/dt)
 it = 0
@@ -77,7 +77,7 @@ frames = 100
 q1_log = quadlog.quadlog(time)
 q2_log = quadlog.quadlog(time)
 q3_log = quadlog.quadlog(time)
-Ed_log = np.zeros((time.size, fc.edges))
+Ed_log = np.zeros((time.size, 3))
 
 # Plots
 quadcolor = ['r', 'g', 'b']
@@ -86,7 +86,7 @@ pl.ion()
 fig = pl.figure(0)
 axis3d = fig.add_subplot(111, projection='3d')
 
-init_area = 5
+init_area = 10
 s = 2
 
 # Desired altitude and heading
@@ -116,10 +116,28 @@ for t in time:
     RA1.handle_other_msg(Id1=RA2.id, Id2=RA3.id, range=get_dist(RA2.pos, RA3.pos))
 
     A,B,C = RA1.define_triangle()
+
+
+    #fc = form.formation_distance(2, 1, dtriang, mu, tilde_mu, RA1.get_B(), 5e-2, 5e-1)
+
     X = [A.x, A.y, B.x, B.y, C.x, C.y]
+    '''
+    print("Ground Truth: ")
+    print(q1.xyz[0:2])
+    print(q2.xyz[0:2])
+    print(A.x, A.y)
+    print(B.x, B.y)
+    '''
+    #print(fc)
+    #q2x = ((abs(A.x-B.x)) - (side))/5 + ((abs(C.x-B.x)) - (side))/5
+    #q2y = ((abs(A.y-B.y)) - (side))/5 + ((abs(C.y-B.y)) - (side))/5
+    #q3x = ((abs(A.x-C.x)) - (side))/5 + ((abs(B.x-C.x)) - (side))/5
+    #q3y = ((abs(A.y-C.y)) - (side))/5 + ((abs(B.y-C.y)) - (side))/5
 
     #Set This U (Input) from another class
-    U = fc.u_acc(X, V)
+    U = RA1.calc_u_acc()
+
+    #print("U: ", U)
 
 
     #Using lyapunov, input 2D acc, and desired alt
@@ -139,9 +157,9 @@ for t in time:
         ani.draw3d(axis3d, q1.xyz, q1.Rot_bn(), quadcolor[0])
         ani.draw3d(axis3d, q2.xyz, q2.Rot_bn(), quadcolor[1])
         ani.draw3d(axis3d, q3.xyz, q3.Rot_bn(), quadcolor[2])
-        axis3d.set_xlim(-5, 5)
-        axis3d.set_ylim(-5, 5)
-        axis3d.set_zlim(0, 10)
+        axis3d.set_xlim(-15, 15)
+        axis3d.set_ylim(-15, 15)
+        axis3d.set_zlim(0, 15)
         axis3d.set_xlabel('South [m]')
         axis3d.set_ylabel('East [m]')
         axis3d.set_zlabel('Up [m]')

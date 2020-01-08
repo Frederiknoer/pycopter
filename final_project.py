@@ -12,25 +12,29 @@ import uwb_agent as range_agent
 
 
 def get_dist(p1, p2):
-    p1 = Point(p1[0], p1[1])
-    p2 = Point(p2[0], p2[1])
-    dist = math.sqrt( (p2.x - p1.x)**2 + (p2.y - p1.y)**2 )
-    return dist
+    std_err = np.random.normal(mu, sigma, 1)[0]
+    return (np.linalg.norm(p1 - p2)) + std_err
 
-def getMag(x,y):
-    return math.sqrt(x**2 + y**2)
-
-def dotVec(v1, v2):
-    return (v1.x * v2.x) + (v1.y + v2.y)
+def vecLen(v):
+    return math.sqrt(np.dot(v,v))
 
 def getAngle(v1, v2):
-    return np.arctan(dotVec(v1,v2) / (getMag(v1.x,v1.y))*(getMag(v2.x,v2.y)))
+    return np.arctan( (np.dot(v1, v2)) / (vecLen(v1)*vecLen(v2)) )
 
 def getRotMat(q1, q2, q3, A, B, C):
-    q1 = Point(q1[0],q1[1])
-    q2 = Point(q2[0],q2[1])
-    q3 = Point(q3[0],q3[1])
-    a = (getAngle(q1, A) + getAngle(q2, B) + getAngle(q3, C)) / 3
+    v1q = abs(q1 - q2)
+    v1a = abs(A - B)
+    v2q = abs(q1 - q3)
+    v2a = abs(A - C)
+    v3q = abs(q2 - q3)
+    v3a = abs(B - C)
+
+    print("Angles: ")
+    print(getAngle(v1q, v1a))
+    print(getAngle(v2q, v2a))
+    print(getAngle(v3q, v3a))
+
+    a = (getAngle(v1q, v1a) + getAngle(v2q, v2a) + getAngle(v3q, v3a)) / 3
 
     m11 = np.cos(a)
     m12 = np.sin(a)
@@ -61,9 +65,9 @@ kw = 1/0.18   # rad/s
 # Initial conditions
 att_0 = np.array([0.0, 0.0, 0.0])
 pqr_0 = np.array([0.0, 0.0, 0.0])
-xyz1_0 = np.array([1.0, 1.2, 0.0])
-xyz2_0 = np.array([1.2, 2.0, 0.0])
-xyz3_0 = np.array([-1.1, 2.6, 0.0])
+xyz1_0 = np.array([0.0, 0.0, 0.0])
+xyz2_0 = np.array([3.0, 3.0, 0.0])
+xyz3_0 = np.array([-3.1, 2.6, 0.0])
 v_ned_0 = np.array([0.0, 0.0, 0.0])
 w_0 = np.array([0.0, 0.0, 0.0, 0.0])
 
@@ -77,20 +81,8 @@ q2 = quad.quadrotor(2, m, l, J, CDl, CDr, kt, km, kw, \
 q3 = quad.quadrotor(3, m, l, J, CDl, CDr, kt, km, kw, \
         att_0, pqr_0, xyz3_0, v_ned_0, w_0)
 
-# Formation Control
-# Shape
-side = 8
-Btriang = np.array([[1, 0, -1],[-1, 1, 0],[0, -1, 1]])
-dtriang = np.array([side, side, side])
-
-# Motion
-mu = 0e-2*np.array([1, 1, 1])
-tilde_mu = 0e-2*np.array([1, 1, 1])
-
-fc = form.formation_distance(2, 1, dtriang, mu, tilde_mu, Btriang, 5e-2, 5e-1)
-
 # Simulation parameters
-tf = 300
+tf = 500
 dt = 5e-2
 time = np.linspace(0, tf, tf/dt)
 it = 0
@@ -111,6 +103,7 @@ axis3d = fig.add_subplot(111, projection='3d')
 
 init_area = 10
 s = 2
+mu, sigma = 0, 0.2
 
 # Desired altitude and heading
 alt_d = 4
@@ -118,49 +111,39 @@ q1.yaw_d = -np.pi
 q2.yaw_d =  np.pi/2
 q3.yaw_d =  0
 
-RA1 = range_agent.uwb_agent(ID=0, pos=Point( q1.xyz[0], q1.xyz[1] ))
-RA2 = range_agent.uwb_agent(ID=1, pos=Point( q2.xyz[0], q2.xyz[1] ))
-RA3 = range_agent.uwb_agent(ID=2, pos=Point( q3.xyz[0], q3.xyz[1] ))
+RA1 = range_agent.uwb_agent( ID=0 )
+RA2 = range_agent.uwb_agent( ID=1 )
+RA3 = range_agent.uwb_agent( ID=2 )
 
 for t in time:
-
-    # Simulation
-    #X = np.append(q1.xyz[0:2], np.append(q2.xyz[0:2], q3.xyz[0:2]))
-    V = np.append(q1.v_ned[0:2], np.append(q2.v_ned[0:2], q3.v_ned[0:2]))
-
-    #NEW:
     RA1.update_pos(q1.xyz[0:2])
     RA2.update_pos(q2.xyz[0:2])
     RA3.update_pos(q3.xyz[0:2])
 
-    RA1.handle_range_msg(Id=RA2.id, nb_pos=RA2.pos)
-    RA1.handle_range_msg(Id=RA3.id, nb_pos=RA3.pos)
-
-    RA1.handle_other_msg(Id1=RA2.id, Id2=RA3.id, range=get_dist(RA2.pos, RA3.pos))
+    RA1.handle_range_msg(Id=RA2.id, range=get_dist(q1.xyz[0:2], q2.xyz[0:2]))
+    RA1.handle_range_msg(Id=RA3.id, range=get_dist(q1.xyz[0:2], q3.xyz[0:2]))
+    RA1.handle_other_msg(Id1=RA2.id, Id2=RA3.id, range=get_dist(q2.xyz[0:2], q3.xyz[0:2]))
 
     A,B,C = RA1.define_triangle()
+    X = np.array([A[0], -A[1], B[0], -B[1], C[0], -C[1]])
+    print(X)
 
-
-    #fc = form.formation_distance(2, 1, dtriang, mu, tilde_mu, RA1.get_B(), 5e-2, 5e-1)
-
-    X = [A.x, A.y, B.x, B.y, C.x, C.y]
-
-    rotmat = getRotMat(q1.xyz[0:2], q2.xyz[0:2], q3.xyz[0:3], A, B, C)
+    rotmat = getRotMat(q1.xyz[0:2], q2.xyz[0:2], q3.xyz[0:2], X[0:2], X[2:4], X[4:6])
     u = RA1.calc_u_acc()
-    u1 = rotmat.dot(np.array([ u[0], u[1] ]) )
-    u2 = rotmat.dot(np.array([ u[2], u[3] ]) )
-    u3 = rotmat.dot(np.array([ u[4], u[5] ]) )
+    u1 = rotmat.dot(u[0:2])
+    u2 = rotmat.dot(u[2:4])
+    u3 = rotmat.dot(u[4:6])
 
-    U = u1[0], u1[1], u2[0], u2[1], u3[0], u3[0]
+    U = np.array([u1[0], u1[1], u2[0], u2[1], u3[0], u3[1]])
 
     print("Orientation corrected U: ")
     print(U)
 
 
     #Using lyapunov, input 2D acc, and desired alt
-    q1.set_a_2D_alt_lya(U[0:2], -alt_d)
-    q2.set_a_2D_alt_lya(U[2:4], -alt_d)
-    q3.set_a_2D_alt_lya(U[4:6], -alt_d)
+    q1.set_v_2D_alt_lya(U[0:2], -alt_d)
+    q2.set_v_2D_alt_lya(U[2:4], -alt_d)
+    q3.set_v_2D_alt_lya(U[4:6], -alt_d)
 
     q1.step(dt)
     q2.step(dt)
@@ -189,19 +172,6 @@ for t in time:
         #    namepic = '0' + namepic
         #pl.savefig("./images/%s.png"%namepic)
 
-        pl.figure(1)
-        pl.clf()
-        ani.draw2d(1, X, fc, quadcolor)
-        ani.draw_edges(1, X, fc, -1)
-        pl.xlabel('South [m]')
-        pl.ylabel('West [m]')
-        pl.title('2D Map')
-        pl.xlim(-s*init_area, s*init_area)
-        pl.ylim(-s*init_area, s*init_area)
-        pl.grid()
-        pl.pause(0.001)
-        pl.draw()
-
 
     # Log
     q1_log.xyz_h[it, :] = q1.xyz
@@ -219,7 +189,6 @@ for t in time:
     q3_log.w_h[it, :] = q3.w
     q3_log.v_ned_h[it, :] = q3.v_ned
 
-    Ed_log[it, :] = fc.Ed
 
     it+=1
 

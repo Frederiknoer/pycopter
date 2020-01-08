@@ -4,6 +4,9 @@ import numpy as np
 from shapely.geometry import Point, LineString, Polygon
 import math
 
+from filterpy.kalman import KalmanFilter
+from filterpy.common import Q_discrete_white_noise
+
 import quadrotor as quad
 import formation_distance as form
 import quadlog
@@ -12,6 +15,7 @@ import uwb_agent as range_agent
 
 
 def get_dist(p1, p2):
+    mu, sigma = 0, 11.0
     std_err = np.random.normal(mu, sigma, 1)[0]
     return (np.linalg.norm(p1 - p2)) + std_err
 
@@ -29,10 +33,10 @@ def getRotMat(q1, q2, q3, A, B, C):
     v3q = abs(q2 - q3)
     v3a = abs(B - C)
 
-    print("Angles: ")
-    print(getAngle(v1q, v1a))
-    print(getAngle(v2q, v2a))
-    print(getAngle(v3q, v3a))
+    #print("Angles: ")
+    #print(getAngle(v1q, v1a))
+    #print(getAngle(v2q, v2a))
+    #print(getAngle(v3q, v3a))
 
     a = (getAngle(v1q, v1a) + getAngle(v2q, v2a) + getAngle(v3q, v3a)) / 3
 
@@ -103,7 +107,6 @@ axis3d = fig.add_subplot(111, projection='3d')
 
 init_area = 10
 s = 2
-mu, sigma = 0, 0.2
 
 # Desired altitude and heading
 alt_d = 4
@@ -116,29 +119,21 @@ RA2 = range_agent.uwb_agent( ID=1 )
 RA3 = range_agent.uwb_agent( ID=2 )
 
 for t in time:
-    RA1.update_pos(q1.xyz[0:2])
-    RA2.update_pos(q2.xyz[0:2])
-    RA3.update_pos(q3.xyz[0:2])
-
     RA1.handle_range_msg(Id=RA2.id, range=get_dist(q1.xyz[0:2], q2.xyz[0:2]))
     RA1.handle_range_msg(Id=RA3.id, range=get_dist(q1.xyz[0:2], q3.xyz[0:2]))
     RA1.handle_other_msg(Id1=RA2.id, Id2=RA3.id, range=get_dist(q2.xyz[0:2], q3.xyz[0:2]))
 
-    A,B,C = RA1.define_triangle()
-    X = np.array([A[0], -A[1], B[0], -B[1], C[0], -C[1]])
-    print(X)
+    A1,B1,C1 = RA1.define_triangle()
 
+    X = np.array([A1[0], -A1[1], B1[0], -B1[1], C1[0], -C1[1]])
     rotmat = getRotMat(q1.xyz[0:2], q2.xyz[0:2], q3.xyz[0:2], X[0:2], X[2:4], X[4:6])
     u = RA1.calc_u_acc()
+
     u1 = rotmat.dot(u[0:2])
     u2 = rotmat.dot(u[2:4])
     u3 = rotmat.dot(u[4:6])
 
     U = np.array([u1[0], u1[1], u2[0], u2[1], u3[0], u3[1]])
-
-    print("Orientation corrected U: ")
-    print(U)
-
 
     #Using lyapunov, input 2D acc, and desired alt
     q1.set_v_2D_alt_lya(U[0:2], -alt_d)

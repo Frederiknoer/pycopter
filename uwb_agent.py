@@ -9,7 +9,6 @@ DEBUG = False
 class uwb_agent:
     def __init__(self, ID):
         self.id = ID
-        #self.pos = pos
         self.incidenceMatrix = np.array([])
         self.M = np.array([self.id]) #Modules
         self.N = np.array([]) #Neigbours
@@ -21,27 +20,18 @@ class uwb_agent:
         self.I = np.array([[1,0],[0,1]])
         self.poslist = np.array([])
 
-    def update_pos(self, new_pos):
-        self.pos = new_pos
-
     def get_B(self):
         return self.incidenceMatrix
 
     def calc_dist(self, p1, p2):
-        dist = np.linalg.norm(p1 - p2)
-        return dist
-
-    def get_distance(self, remote_pos):
-        return self.calc_dist(self.pos, remote_pos)
+        return np.linalg.norm(p1 - p2)
 
     def update_incidenceMatrix(self):
         self.incidenceMatrix = np.array([])
         self.P = np.array([])
-        rows = len(self.M)
-        cols = self.pairs.shape[0]
-        self.incidenceMatrix = np.zeros((rows,cols), dtype=int)
+        self.incidenceMatrix = np.zeros((3,3), dtype=int)
         for i, pair in enumerate(self.pairs):
-            col = np.zeros(rows, dtype=int)
+            col = np.zeros(3, dtype=int)
             m1 = int(pair[0])
             m2 = int(pair[1])
             col[m1] = 1
@@ -74,7 +64,6 @@ class uwb_agent:
 
 
     def handle_range_msg(self, Id, range):
-        #range = self.get_distance(nb_pos)
         self.add_nb_module(Id, range)
         self.update_incidenceMatrix()
 
@@ -82,12 +71,15 @@ class uwb_agent:
         self.add_pair(Id1, Id2, range)
         self.update_incidenceMatrix()
 
+    def clean_cos(self, cos_angle):
+        return min(1,max(cos_angle,-1))
+
     def define_triangle(self):
         c,b,a = self.P[0:3]
         print("a:",a," b:",b," c:",c)
-        angle_a = math.acos( (b**2 + c**2 - a**2) / (2 * b * c) )
-        angle_b = math.acos( (a**2 + c**2 - b**2) / (2 * a * c) )
-        angle_c = math.acos( (a**2 + b**2 - c**2) / (2 * a * b) )
+        angle_a = math.acos(self.clean_cos( (b**2 + c**2 - a**2) / (2 * b * c) ))
+        angle_b = math.acos(self.clean_cos( (a**2 + c**2 - b**2) / (2 * a * c) ))
+        angle_c = math.acos(self.clean_cos( (a**2 + b**2 - c**2) / (2 * a * b) ))
 
         A = np.array([0.0, 0.0])
         B = np.array([c, 0.0])
@@ -132,11 +124,8 @@ class uwb_agent:
                     u_y += K * E[i][k] * unitvec[1]
 
             U = np.append(U, [u_x, u_y])
-
-
-        print("U: ")
-        print(U)
-
+        #print("U: ")
+        #print(U)
         return U
 
 

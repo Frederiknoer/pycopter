@@ -1,10 +1,58 @@
 #!/usr/bin/env python
-from shapely.geometry import Point, LineString, Polygon
 import math
 import numpy as np
-import matplotlib.pyplot as plt
+from filterpy.kalman import KalmanFilter
+from filterpy.common import Q_discrete_white_noise
 
 DEBUG = False
+
+class KalmanFilterPos:
+    def __init__(self):
+        self.x_pos = 0
+        self.y_pos = 0
+        self.speed = 0.0
+        self.dt = 5e-2
+        r=2
+
+        self.KF = KalmanFilter(dim_x=4, dim_z=4)
+        #State matrix:
+        self.KF.x = np.array([  [0.0], #Pos_x
+                                [0.0], #Vel_x
+                                [0.0], #Pos_y
+                                [0.0]])#Vel_y
+        #Covariance Matrix:
+        self.KF.P = np.array([  [100.0, 0.0, 0.0, 0.0],
+                                [0.0, 100.0, 0.0, 0.0],
+                                [0.0, 0.0, 100.0, 0.0],
+                                [0.0, 0.0, 0.0, 100.0]])
+
+        #Proces- and Measurements Noise
+        self.KF.Q = Q_discrete_white_noise(dim=4, dt=self.dt, var=r**2)
+        self.KF.R = np.array([  [r, 0.0, 0.0, 0.0],
+                                [0.0, r, 0.0, 0.0],
+                                [0.0, 0.0, r, 0.0],
+                                [0.0, 0.0, 0.0, r]])
+
+        #Measurement function
+        self.KF.H = np.array([  [1.0, 0.0, 0.0, 0.0],
+                                [0.0, 0.0, 0.0, 0.0],
+                                [0.0, 0.0, 1.0, 0.0],
+                                [0.0, 0.0, 0.0, 0.0]])
+
+        self.KF.F = np.array(([ [1.0, self.dt, 0.0, 0.0],
+                                [0.0,   1.0,  0.0,  0.0],
+                                [0.0, 0.0, 1.0, self.dt],
+                                [0.0,   0.0,  0.0,  1.0]]))
+
+    def Predict(self):
+        self.KF.predict()
+        self.x_pos = self.KF.x[0]
+        self.y_pos = self.KF.x[2]
+
+    def updateValues(self, new_x_pos, new_y_pos, x_vel, y_vel):
+        self.KF.update([[new_x_pos], [x_vel], [new_y_pos], [y_vel]])
+        #self.speed = math.sqrt(math.pow(float(self.KF.x[1]),2) + math.pow(float(self.KF.x[3]),2))
+
 
 class uwb_agent:
     def __init__(self, ID):
@@ -19,6 +67,12 @@ class uwb_agent:
         self.des_dist = 15
         self.I = np.array([[1,0],[0,1]])
         self.poslist = np.array([])
+
+        #Kalman stuff
+        self.usingKalman = True
+        self.kf_A = KalmanFilterPos()
+        self.kf_B = KalmanFilterPos()
+        self.kf_C = KalmanFilterPos()
 
     def get_B(self):
         return self.incidenceMatrix
@@ -76,7 +130,7 @@ class uwb_agent:
 
     def define_triangle(self):
         c,b,a = self.P[0:3]
-        print("a:",a," b:",b," c:",c)
+        #print("a:",a," b:",b," c:",c)
         angle_a = math.acos(self.clean_cos( (b**2 + c**2 - a**2) / (2 * b * c) ))
         angle_b = math.acos(self.clean_cos( (a**2 + c**2 - b**2) / (2 * a * c) ))
         angle_c = math.acos(self.clean_cos( (a**2 + b**2 - c**2) / (2 * a * b) ))
@@ -88,11 +142,32 @@ class uwb_agent:
         self.poslist = A,B,C
         return A, B, C #, angle_a, angle_b, angle_c
 
-    def calcErrorMatrix(self):
+    def kalman_triangle_update(self, vel_A, vel_B, vel_C):
+        self.kf_A.updateValues(self.poslist[0][0], self.poslist[0][1], vel_A[0], -vel_A[1])
+        self.kf_B.updateValues(self.poslist[1][0], self.poslist[1][1], vel_B[0], -vel_B[1])
+        self.kf_C.updateValues(self.poslist[2][0], self.poslist[2][1], vel_C[0], -vel_C[1])
+
+    def kalman_triangle_predict(self):
+        self.kf_A.Predict()
+        self.kf_B.Predict()
+        self.kf_C.Predict()
+        A = np.array([self.kf_A.x_pos, self.kf_A.y_pos])
+        B = np.array([self.kf_B.x_pos, self.kf_B.y_pos])
+        C = np.array([self.kf_C.x_pos, self.kf_C.y_pos])
+        self.poslist = A,B,C
+        return A, B, C
+
+    def calcErrorMatrix(self, vel_A, vel_B, vel_C):
         arrSize = self.M.size
 
         self.errorMatrix = np.zeros((arrSize, arrSize))
+        if self.usingKalman:
+            self.kalman_triangle_update(vel_A, vel_B, vel_C)
+            self.kalman_triangle_predict()
+
         poslist = self.poslist
+        #print("pos, kalman-pos: ")
+        #print(self.poslist, poslist)
 
         for i in range(arrSize):
             for j in range(arrSize):
@@ -102,8 +177,8 @@ class uwb_agent:
                 else:
                     self.errorMatrix[i][j] = curDis - self.des_dist
 
-    def calc_u_acc(self):
-        self.calcErrorMatrix()
+    def calc_u_acc(self, vel_A, vel_B, vel_C):
+        self.calcErrorMatrix(vel_A, vel_B, vel_C)
 
         U = np.array([])
         K = 0.02

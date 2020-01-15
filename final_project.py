@@ -12,6 +12,8 @@ import quadlog
 import animation as ani
 import uwb_agent as range_agent
 
+def get_dist_clean(p1, p2):
+    return (np.linalg.norm(p1 - p2))
 
 def get_dist(p1, p2):
     mu, sigma = 0, 2
@@ -65,9 +67,8 @@ kw = 1/0.18   # rad/s
 att_0 = np.array([0.0, 0.0, 0.0])
 pqr_0 = np.array([0.0, 0.0, 0.0])
 xyz1_0 = np.array([0.0, 0.0, 0.0])
-xyz2_0 = np.array([3.0, 3.0, 0.0])
-xyz3_0 = np.array([-3.1, 2.6, 0.0])
-xyz4_0 = np.array([2.1, -2.6, 0.0])
+xyz2_0 = np.array([5.0, 0.0, 0.0])
+xyz3_0 = np.array([3.0, 4.5, 0.0])
 v_ned_0 = np.array([0.0, 0.0, 0.0])
 w_0 = np.array([0.0, 0.0, 0.0, 0.0])
 
@@ -82,7 +83,7 @@ q3 = quad.quadrotor(3, m, l, J, CDl, CDr, kt, km, kw, \
         att_0, pqr_0, xyz3_0, v_ned_0, w_0)
 
 # Simulation parameters
-tf = 750
+tf = 800
 dt = 5e-2
 time = np.linspace(0, tf, tf/dt)
 it = 0
@@ -118,41 +119,32 @@ for t in time:
     RA1.handle_range_msg(Id=RA2.id, range=get_dist(q1.xyz[0:2], q2.xyz[0:2]))
     RA1.handle_range_msg(Id=RA3.id, range=get_dist(q1.xyz[0:2], q3.xyz[0:2]))
     RA1.handle_other_msg(Id1=RA2.id, Id2=RA3.id, range=get_dist(q2.xyz[0:2], q3.xyz[0:2]))
-    '''
-    RA2.handle_range_msg(Id=RA1.id, range=get_dist(q2.xyz[0:2], q1.xyz[0:2]))
+
     RA2.handle_range_msg(Id=RA3.id, range=get_dist(q2.xyz[0:2], q3.xyz[0:2]))
+    RA2.handle_range_msg(Id=RA1.id, range=get_dist(q2.xyz[0:2], q1.xyz[0:2]))
     RA2.handle_other_msg(Id1=RA1.id, Id2=RA3.id, range=get_dist(q1.xyz[0:2], q3.xyz[0:2]))
 
     RA3.handle_range_msg(Id=RA1.id, range=get_dist(q3.xyz[0:2], q1.xyz[0:2]))
     RA3.handle_range_msg(Id=RA2.id, range=get_dist(q3.xyz[0:2], q2.xyz[0:2]))
     RA3.handle_other_msg(Id1=RA1.id, Id2=RA2.id, range=get_dist(q1.xyz[0:2], q2.xyz[0:2]))
-    '''
+
     A1,B1,C1 = RA1.define_triangle()
-    #A2,B2,C2 = RA2.define_triangle()
-    #A3,B3,C3 = RA3.define_triangle()
+    A2,B2,C2 = RA2.define_triangle()
+    A3,B3,C3 = RA3.define_triangle()
 
     X1 = np.array([A1[0], -A1[1], B1[0], -B1[1], C1[0], -C1[1]])
-    #X2 = np.array([A2[0], -A2[1], B2[0], -B2[1], C2[0], -C2[1]])
-    #X3 = np.array([A3[0], -A3[1], B3[0], -B3[1], C3[0], -C3[1]])
-    '''
-    print("Actual Position: ")
-    print(q1.xyz[0:2], q2.xyz[0:2], q3.xyz[0:2])
-    print("Estimated Postion: ")
-    print(X1)
-    print("")
-    '''
+    X2 = np.array([A2[0], -A2[1], B2[0], -B2[1], C2[0], -C2[1]])
+    X3 = np.array([A3[0], -A3[1], B3[0], -B3[1], C3[0], -C3[1]])
 
     rotmat1 = getRotMat(q1.xyz[0:2], q2.xyz[0:2], q3.xyz[0:2], X1[0:2], X1[2:4], X1[4:6])
-    #rotmat2 = getRotMat(q1.xyz[0:2], q2.xyz[0:2], q3.xyz[0:2], X2[2:4], X2[0:2], X2[4:6])
-    #rotmat3 = getRotMat(q1.xyz[0:2], q2.xyz[0:2], q3.xyz[0:2], X3[4:6], X3[0:2], X3[2:4])
+    rotmat2 = getRotMat(q1.xyz[0:2], q2.xyz[0:2], q3.xyz[0:2], X2[2:4], X2[4:6], X2[0:2])
+    rotmat3 = getRotMat(q1.xyz[0:2], q2.xyz[0:2], q3.xyz[0:2], X3[4:6], X3[0:2], X3[2:4])
 
-    u = RA1.calc_u_acc(q1.v_ned, q2.v_ned, q3.v_ned)
-    #u2 = RA2.calc_u_acc()
-    #u3 = RA3.calc_u_acc()
+    U = RA1.calc_u_acc(q1.v_ned, q2.v_ned, q3.v_ned)
 
-    u1 = rotmat1.dot(u[0:2])
-    u2 = rotmat1.dot(u[2:4])
-    u3 = rotmat1.dot(u[4:6])
+    u1 = rotmat1.dot(U[0:2])
+    u2 = rotmat1.dot(U[2:4])
+    u3 = rotmat1.dot(U[4:6])
 
     U = np.array([u1[0], u1[1], u2[0], u2[1], u3[0], u3[1]])
 
@@ -205,6 +197,9 @@ for t in time:
     q3_log.w_h[it, :] = q3.w
     q3_log.v_ned_h[it, :] = q3.v_ned
 
+    Ed_log[it, :] = np.array([get_dist_clean(q1.xyz[0:2],q2.xyz[0:2])-15,
+                                get_dist_clean(q1.xyz[0:2],q3.xyz[0:2])-15,
+                                get_dist_clean(q3.xyz[0:2],q2.xyz[0:2])-15])
 
     it+=1
 

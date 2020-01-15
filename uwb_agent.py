@@ -12,7 +12,7 @@ class KalmanFilterPos:
         self.y_pos = 0
         self.speed = 0.0
         self.dt = 5e-2
-        r=2
+        r=12
 
         self.KF = KalmanFilter(dim_x=4, dim_z=4)
         #State matrix:
@@ -51,7 +51,8 @@ class KalmanFilterPos:
 
     def updateValues(self, new_x_pos, new_y_pos, x_vel, y_vel):
         self.KF.update([[new_x_pos], [x_vel], [new_y_pos], [y_vel]])
-        #self.speed = math.sqrt(math.pow(float(self.KF.x[1]),2) + math.pow(float(self.KF.x[3]),2))
+        #self.speed = math.sqrt(math.pow(float(self.KF.x[1]),2)
+        #+ math.pow(float(self.KF.x[3]),2))
 
 
 class uwb_agent:
@@ -130,14 +131,19 @@ class uwb_agent:
 
     def define_triangle(self):
         c,b,a = self.P[0:3]
-        #print("a:",a," b:",b," c:",c)
+
         angle_a = math.acos(self.clean_cos( (b**2 + c**2 - a**2) / (2 * b * c) ))
         angle_b = math.acos(self.clean_cos( (a**2 + c**2 - b**2) / (2 * a * c) ))
         angle_c = math.acos(self.clean_cos( (a**2 + b**2 - c**2) / (2 * a * b) ))
 
         A = np.array([0.0, 0.0])
         B = np.array([c, 0.0])
-        C = np.array([b*math.cos(angle_a), b*math.sin(angle_a)])
+        if self.id == 0:
+            C = np.array([b*math.cos(angle_a), b*math.sin(angle_a)])
+        elif self.id == 1:
+            C = np.array([b*math.cos(angle_a), b*math.sin(angle_a)])
+        elif self.id == 2:
+            C = np.array([b*math.cos(angle_a), b*math.sin(angle_a)])
 
         self.poslist = A,B,C
         return A, B, C #, angle_a, angle_b, angle_c
@@ -157,17 +163,18 @@ class uwb_agent:
         self.poslist = A,B,C
         return A, B, C
 
-    def calcErrorMatrix(self, vel_A, vel_B, vel_C):
+    def calcErrorMatrix(self,v1,v2,v3):
         arrSize = self.M.size
 
         self.errorMatrix = np.zeros((arrSize, arrSize))
+
         if self.usingKalman:
-            self.kalman_triangle_update(vel_A, vel_B, vel_C)
+            self.kalman_triangle_update(v1, v2, v3)
             self.kalman_triangle_predict()
 
+
         poslist = self.poslist
-        #print("pos, kalman-pos: ")
-        #print(self.poslist, poslist)
+        print("ID: ",self.id,"  Poslist: ",poslist)
 
         for i in range(arrSize):
             for j in range(arrSize):
@@ -176,13 +183,14 @@ class uwb_agent:
                     self.errorMatrix[i][j] = 0.0
                 else:
                     self.errorMatrix[i][j] = curDis - self.des_dist
+        print("Error Matrix: ")
+        print(self.errorMatrix)
 
-    def calc_u_acc(self, vel_A, vel_B, vel_C):
-        self.calcErrorMatrix(vel_A, vel_B, vel_C)
+    def calc_u_acc(self,v1,v2,v3):
+        self.calcErrorMatrix(v1,v2,v3)
 
         U = np.array([])
-        K = 0.02
-        u = 0
+        K = 0.01
         E = self.errorMatrix
 
         for i in range(self.M.size):
@@ -199,8 +207,8 @@ class uwb_agent:
                     u_y += K * E[i][k] * unitvec[1]
 
             U = np.append(U, [u_x, u_y])
-        #print("U: ")
-        #print(U)
+        print("U: ")
+        print(U)
         return U
 
 

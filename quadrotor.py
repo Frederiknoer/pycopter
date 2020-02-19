@@ -141,7 +141,7 @@ class quadrotor:
         #Set acc in x and y
         ax = a_2d_d[0]
         ay = a_2d_d[1]
-        
+
         # Guidance attitude
         phi_d = -self.m/self.T_d*(ay*np.cos(self.att[2])-ax*np.sin(self.att[2]))
         the_d =  self.m/self.T_d*(ax*np.cos(self.att[2])+ay*np.sin(self.att[2]))
@@ -168,6 +168,11 @@ class quadrotor:
         e_v = vxy - vxy_d
         self.e_v = e_v
 
+        #T_d = desired Thrust
+        #xi_g = gravity
+        #k_alt = gain altitude
+        #k_vz = gain velocity z
+        #m = mass
         self.T_d = (-self.xi_g -self.k_alt*e_alt \
                 -self.k_vz*self.v_ned[2])*self.m
 
